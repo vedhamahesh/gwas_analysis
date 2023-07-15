@@ -1,0 +1,560 @@
+---
+title: "BTRY4830-Project"
+author: "Vedha Mahesh"
+date: "2023-05-05"
+output:
+  word_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+# install.packages("ggplot2")
+# install.packages("ggfortify")
+# install.packages("zoo")
+```
+
+```{r}
+libs = c('tidyverse', 'data.table', 'MASS',
+         'ggsci', 'ggthemes', 'ggpubr', 'KEGGREST',
+         'rentrez', 'tidyimpute','ggplot','ggfortify')
+suppressMessages(
+  suppressWarnings(sapply(libs, require, character.only = TRUE))
+)
+rm(libs)
+theme_set(theme_few(14))
+
+```
+
+### 1. 
+#### a. 
+```{r}
+
+pheno_import <- read.csv("projectphenotypes.csv")
+
+pheno1 <- pheno_import$ENSG00000164308.12
+
+hist(pheno1, main = "Histogram of Phenotype 1 - ERAP2", xlab = "Trait Value", ylab = "Frequency")
+
+```
+```{r}
+
+pheno_import <- read.csv("projectphenotypes.csv")
+
+pheno2 <- pheno_import$ENSG00000124587.9
+
+hist(pheno2, main = "Histogram of Phenotype 2 - PEX6", xlab = "Trait Value", ylab = "Frequency")
+
+```
+
+```{r}
+
+pheno_import <- read.csv("projectphenotypes.csv")
+
+pheno3 <- pheno_import$ENSG00000180185.7
+
+hist(pheno3, main = "Histogram of Phenotype 3 - FAHD1", xlab = "Trait Value", ylab = "Frequency")
+
+```
+
+```{r}
+
+pheno_import <- read.csv("projectphenotypes.csv")
+
+pheno4 <- pheno_import$ENSG00000168827.9
+
+hist(pheno4, main = "Histogram of Phenotype 4 - GFM1", xlab = "Trait Value", ylab = "Frequency")
+
+```
+
+```{r}
+
+pheno_import <- read.csv("projectphenotypes.csv")
+
+pheno5 <- pheno_import$ENSG00000136536.9
+
+hist(pheno5, main = "Histogram of Phenotype 5 - MARCHF7", xlab = "Trait Value", ylab = "Frequency")
+
+```
+
+
+```{r}
+
+geno_import <- read.csv("projectgenotypes.csv")
+
+N <- ncol(geno_import) - 1
+
+cat("Number of SNPs (N):", N, "\n")
+```
+
+```{r}
+gen_import <- read.csv("projectgenotypes.csv")
+gen_import<- gen_import[,-1]
+colnames(gen_import) <- NULL 
+rownames(gen_import) <- NULL 
+
+```
+
+```{r, comment = NA, echo=F, eval = TRUE, fig.hold=T, message=F, fig.align = 'center'}
+library(MASS)
+library(dplyr)
+library(ggplot2)
+library(gridExtra)
+library(data.table)
+# Convert genotypes to Xa & Xd
+# # Details can be found in lab 6
+gen_import <- read.csv("projectgenotypes.csv")
+gen_import<- gen_import[,-1]
+colnames(gen_import) <- NULL 
+rownames(gen_import) <- NULL 
+
+xa_mat <- as.matrix(gen_import )
+xd_mat <- ((2*xa_mat) - 1)
+
+
+# Load in phenotype data and run GWAS
+sim_pheno_mx <- read.csv("projectphenotypes.csv", 
+                         header = TRUE, row.names = 1)
+
+pval_calculator <- function(pheno_input, xa_input, xd_input){
+    n_samples <- length(xa_input)
+    X_mx <- cbind(1,xa_input,xd_input)
+    
+    MLE_beta <- ginv(t(X_mx) %*% X_mx) %*% t(X_mx) %*% pheno_input
+    y_hat <- X_mx %*% MLE_beta
+  
+    SSM <- sum((y_hat - mean(pheno_input))^2)
+    SSE <- sum((pheno_input - y_hat)^2)
+    df_M <- 2
+    df_E <- n_samples - 3 
+    MSM <- SSM / df_M
+    MSE <- SSE / df_E
+    Fstatistic <- MSM / MSE
+    
+    pval <- pf(Fstatistic, df_M, df_E,lower.tail = FALSE)
+    return(pval)
+}
+
+results.1 <- lapply(1:ncol(xa_mat), function(column.counter){
+  data.table(pval_calculator(xa_input = xa_mat[, column.counter],
+                 xd_input = xd_mat[, column.counter],
+                 pheno_input = sim_pheno_mx[,1]))
+              }) %>% rbindlist() %>% mutate(p=V1, index = 1:ncol(xa_mat))
+
+results.2 <- lapply(1:ncol(xa_mat), function(column.counter){
+  data.table(pval_calculator(xa_input = xa_mat[, column.counter],
+                 xd_input = xd_mat[, column.counter],
+                 pheno_input = sim_pheno_mx[,2]))
+              }) %>% rbindlist() %>% mutate(p=V1, index = 1:ncol(xa_mat))
+
+results.3 <- lapply(1:ncol(xa_mat), function(column.counter){
+  data.table(pval_calculator(xa_input = xa_mat[, column.counter],
+                 xd_input = xd_mat[, column.counter],
+                 pheno_input = sim_pheno_mx[,3]))
+              }) %>% rbindlist() %>% mutate(p=V1, index = 1:ncol(xa_mat))
+
+results.4 <- lapply(1:ncol(xa_mat), function(column.counter){
+  data.table(pval_calculator(xa_input = xa_mat[, column.counter],
+                 xd_input = xd_mat[, column.counter],
+                 pheno_input = sim_pheno_mx[,4]))
+              }) %>% rbindlist() %>% mutate(p=V1, index = 1:ncol(xa_mat))
+
+results.5 <- lapply(1:ncol(xa_mat), function(column.counter){
+  data.table(pval_calculator(xa_input = xa_mat[, column.counter],
+                 xd_input = xd_mat[, column.counter],
+                 pheno_input = sim_pheno_mx[,5]))
+              }) %>% rbindlist() %>% mutate(p=V1, index = 1:ncol(xa_mat))
+
+# Manhattan Plots
+
+## phenotype 1 - ERAP2
+my.alpha = 0.05/ncol(xa_mat)
+man1 <- ggplot(results.1, aes(x = index, y = -log10(p))) +
+  geom_point() + 
+  geom_hline(yintercept = -log10(my.alpha), color = 'red', lty = 2) +
+  labs(x = 'Index', y = expression(-log[10]~p), 
+       title = 'GWAS Manhattan Plot- ERAP2', subtitle='Covariate NOT Included')
+
+## phenotype 2 - PEX6
+my.alpha = 0.05/ncol(xa_mat)
+man2 <- ggplot(results.2, aes(x = index, y = -log10(p))) +
+  geom_point() + 
+  geom_hline(yintercept = -log10(my.alpha), color = 'red', lty = 2) +
+  labs(x = 'Index', y = expression(-log[10]~p), 
+       title = 'GWAS Manhattan Plot- PEX6', subtitle='Covariate NOT Included')
+
+## phenotype 3 - FAHD1
+my.alpha = 0.05/ncol(xa_mat)
+man3 <- ggplot(results.3, aes(x = index, y = -log10(p))) +
+  geom_point() + 
+  geom_hline(yintercept = -log10(my.alpha), color = 'red', lty = 2) +
+  labs(x = 'Index', y = expression(-log[10]~p), 
+       title = 'GWAS Manhattan Plot - FAHD1', subtitle='Covariate NOT Included')
+
+## phenotype 4 - GFM1
+my.alpha = 0.05/ncol(xa_mat)
+man4 <- ggplot(results.4, aes(x = index, y = -log10(p))) +
+  geom_point() + 
+  geom_hline(yintercept = -log10(my.alpha), color = 'red', lty = 2) +
+  labs(x = 'Index', y = expression(-log[10]~p), 
+       title = 'GWAS Manhattan Plot - GFM1', subtitle='Covariate NOT Included')
+
+## phenotype 5 - MARCHF7
+my.alpha = 0.05/ncol(xa_mat)
+man5 <- ggplot(results.5, aes(x = index, y = -log10(p))) +
+  geom_point() + 
+  geom_hline(yintercept = -log10(my.alpha), color = 'red', lty = 2) +
+  labs(x = 'Index', y = expression(-log[10]~p), 
+       title = 'GWAS Manhattan Plot - MARCHF7', subtitle='Covariate NOT Included')
+
+# QQ plot
+
+## phenotype 1 - ERAP2
+observed_pvals = sort(results.1$p)
+expected_pvals = qunif(seq(0, 1, length.out = length(observed_pvals) + 2), min = 0, max = 1)  ## Generate expected values. Note that we are using length+2
+expected_pvals = expected_pvals[expected_pvals != 0 & expected_pvals != 1]  ## Remove the two extra values since they are 0 and 1
+
+p_df = data.frame(observed = -log10(observed_pvals),
+                  expected = -log10(expected_pvals))
+
+qq <- ggplot(p_df, aes(x = expected, y = observed)) +
+  geom_point() +
+  geom_abline(intercept = 0, slope = 1, color = 'red') +
+  labs(x = '-log10 Expected p-val',
+       y = '-log10 Observed p-val',
+       title = 'GWAS QQ plot - ERAP2',
+       subtitle = 'Covariate NOT Included')
+grid.arrange(man1,qq, ncol=2)
+
+## phenotype 2 - PEX6
+observed_pvals = sort(results.2$p)
+expected_pvals = qunif(seq(0, 1, length.out = length(observed_pvals) + 2), min = 0, max = 1)  ## Generate expected values. Note that we are using length+2
+expected_pvals = expected_pvals[expected_pvals != 0 & expected_pvals != 1]  ## Remove the two extra values since they are 0 and 1
+
+p_df = data.frame(observed = -log10(observed_pvals),
+                  expected = -log10(expected_pvals))
+
+qq <- ggplot(p_df, aes(x = expected, y = observed)) +
+  geom_point() +
+  geom_abline(intercept = 0, slope = 1, color = 'red') +
+  labs(x = '-log10 Expected p-val',
+       y = '-log10 Observed p-val',
+       title = 'GWAS QQ plot - PEX6',
+       subtitle = 'Covariate NOT Included')
+grid.arrange(man2,qq, ncol=2)
+
+## phenotype 3 - FAHD1
+observed_pvals = sort(results.3$p)
+expected_pvals = qunif(seq(0, 1, length.out = length(observed_pvals) + 2), min = 0, max = 1)  ## Generate expected values. Note that we are using length+2
+expected_pvals = expected_pvals[expected_pvals != 0 & expected_pvals != 1]  ## Remove the two extra values since they are 0 and 1
+
+p_df = data.frame(observed = -log10(observed_pvals),
+                  expected = -log10(expected_pvals))
+
+qq <- ggplot(p_df, aes(x = expected, y = observed)) +
+  geom_point() +
+  geom_abline(intercept = 0, slope = 1, color = 'red') +
+  labs(x = '-log10 Expected p-val',
+       y = '-log10 Observed p-val',
+       title = 'GWAS QQ plot - FAHD1',
+       subtitle = 'Covariate NOT Included')
+grid.arrange(man3,qq, ncol=2)
+
+## phenotype 4 - GFM1
+observed_pvals = sort(results.4$p)
+expected_pvals = qunif(seq(0, 1, length.out = length(observed_pvals) + 2), min = 0, max = 1)  ## Generate expected values. Note that we are using length+2
+expected_pvals = expected_pvals[expected_pvals != 0 & expected_pvals != 1]  ## Remove the two extra values since they are 0 and 1
+
+p_df = data.frame(observed = -log10(observed_pvals),
+                  expected = -log10(expected_pvals))
+
+qq <- ggplot(p_df, aes(x = expected, y = observed)) +
+  geom_point() +
+  geom_abline(intercept = 0, slope = 1, color = 'red') +
+  labs(x = '-log10 Expected p-val',
+       y = '-log10 Observed p-val',
+       title = 'GWAS QQ plot - GFM1',
+       subtitle = 'Covariate NOT Included')
+grid.arrange(man4,qq, ncol=2)
+
+## phenotype 5 - MARCHF7
+observed_pvals = sort(results.5$p)
+expected_pvals = qunif(seq(0, 1, length.out = length(observed_pvals) + 2), min = 0, max = 1)  ## Generate expected values. Note that we are using length+2
+expected_pvals = expected_pvals[expected_pvals != 0 & expected_pvals != 1]  ## Remove the two extra values since they are 0 and 1
+
+p_df = data.frame(observed = -log10(observed_pvals),
+                  expected = -log10(expected_pvals))
+
+qq <- ggplot(p_df, aes(x = expected, y = observed)) +
+  geom_point() +
+  geom_abline(intercept = 0, slope = 1, color = 'red') +
+  labs(x = '-log10 Expected p-val',
+       y = '-log10 Observed p-val',
+       title = 'GWAS QQ plot - MARCHF7',
+       subtitle = 'Covariate NOT Included')
+grid.arrange(man5,qq, ncol=2)
+```
+
+```{r, fig.align = 'center'}
+# Convert genotypes to Xa & Xd
+# # Details can be found in lab 6
+gen_import <- read.csv("projectgenotypes.csv")
+gen_import<- gen_import[,-1]
+colnames(gen_import) <- NULL 
+rownames(gen_import) <- NULL 
+
+xa_mat <- as.matrix(gen_import )
+xd_mat <- ((2*xa_mat) - 1)
+
+
+# Load in phenotype data and run GWAS
+sim_pheno_mx <- read.csv("projectphenotypes.csv", 
+                         header = TRUE, row.names = 1)
+
+# Read-in our covariate data
+xc_mat = read.csv('projectcovars.csv')
+Xc <- model.matrix(~Population + Sex, data=xc_mat)
+xc_mat1 <- Xc[,-1]
+xc_mat1
+
+xc.pca<- prcomp(xa_mat %*% t(xa_mat))
+
+xc.pca$sdev
+(xc.pca$sdev / sum(xc.pca$sdev))*100
+summary(xc.pca)
+
+Xc.just.sex <- model.matrix(~ Sex, data=xc_mat)
+
+xc.pca.and.sex <- cbind(xc.pca, Xc.just.sex)
+
+gene_info <- read.csv('gene_info.csv')
+SNP_info <- read.csv('SNP_info.csv')
+
+# Define our function to run GWAS and get p-values
+pval_calculator_w_covars <- function(pheno_input, xa_input, xd_input, xz_input){
+  n_samples <- length(xa_input) # calculate your number of samples
+  X_mx <- cbind(rep(1,length(xa_input)),xa_input, xd_input, xz_input) #create your X matrix under H1
+  
+  MLE_beta <- ginv(t(X_mx) %*% X_mx) %*% t(X_mx) %*% pheno_input #calculate your MLE of the betas
+  
+  x_h0 =  cbind(rep(1,length(xa_input)), xz_input) #calculate your x under H0
+  MLE_h0 = ginv(t(x_h0) %*% x_h0) %*% t(x_h0) %*% pheno_input #calculate your MLE under h0
+  y_hat_0 = x_h0 %*% MLE_h0 #calculate y_hat under the null hypothesis
+  y_hat_1 = X_mx%*% MLE_beta #calculate y_hat under H1
+  
+  SSE_theta_0 = sum((pheno_input-y_hat_0)^2) #calculate SSE under null 
+  SSE_theta_1 = sum((pheno_input-y_hat_1)^2) #calculate SSE under H1
+  
+  df_M <- 2
+  df_E <- n_samples - 4 
+  
+  numerator <- (SSE_theta_0-SSE_theta_1) / df_M #calculate your F statistic
+  denom <- SSE_theta_1 / df_E
+  Fstatistic <-numerator / denom
+  
+  # to check if it is correct 
+  pval <- pf(Fstatistic, df_M, df_E,lower.tail = FALSE) #calculate your p value and return it
+  return(pval)
+}
+
+# Run the functions
+
+results.1 <- lapply(1:ncol(xa_mat), function(column.counter){
+  data.table(pval_calculator_w_covars(pheno_input = sim_pheno_mx[,1],
+                                      xa_input = as.matrix(xa_mat[, column.counter]),
+                                      xd_input = as.matrix(xd_mat[, column.counter]),
+                                      xz_input = as.matrix(xc_mat1)))
+              }) %>% rbindlist() %>% mutate(p=V1, index = 1:ncol(xa_mat))
+
+indices1 <- which(p.adjust(results.1$p, method = "bonferroni") <= 0.05)
+hits1 <- sort(SNP_info$position[indices1])
+length(hits1)
+
+
+results.2 <- lapply(1:ncol(xa_mat), function(column.counter){
+  data.table(pval_calculator_w_covars(pheno_input = sim_pheno_mx[,2],
+                                      xa_input = as.matrix(xa_mat[, column.counter]),
+                                      xd_input = as.matrix(xd_mat[, column.counter]),
+                                      xz_input = as.matrix(xc_mat1)))
+              }) %>% rbindlist() %>% mutate(p=V1, index = 1:ncol(xa_mat))
+
+indices2 <- which(p.adjust(results.2$p, method = "bonferroni") <= 0.05)
+hits2 <- sort(SNP_info$position[indices2])
+hits2
+
+
+results.3 <- lapply(1:ncol(xa_mat), function(column.counter){
+  data.table(pval_calculator_w_covars(pheno_input = sim_pheno_mx[,3],
+                                      xa_input = as.matrix(xa_mat[, column.counter]),
+                                      xd_input = as.matrix(xd_mat[, column.counter]),
+                                      xz_input = as.matrix(xc_mat1)))
+              }) %>% rbindlist() %>% mutate(p=V1, index = 1:ncol(xa_mat))
+
+indices3 <- which(p.adjust(results.3$p, method = "bonferroni") <= 0.05)
+hits3 <- sort(SNP_info$position[indices3])
+hits3
+
+
+results.4 <- lapply(1:ncol(xa_mat), function(column.counter){
+  data.table(pval_calculator_w_covars(pheno_input = sim_pheno_mx[,4],
+                                      xa_input = as.matrix(xa_mat[, column.counter]),
+                                      xd_input = as.matrix(xd_mat[, column.counter]),
+                                      xz_input = as.matrix(xc_mat1)))
+              }) %>% rbindlist() %>% mutate(p=V1, index = 1:ncol(xa_mat))
+
+indices4 <- which(p.adjust(results.4$p, method = "bonferroni") <= 0.05)
+hits4 <- sort(SNP_info$position[indices4])
+
+
+results.5 <- lapply(1:ncol(xa_mat), function(column.counter){
+  data.table(pval_calculator_w_covars(pheno_input = sim_pheno_mx[,5],
+                                      xa_input = as.matrix(xa_mat[, column.counter]),
+                                      xd_input = as.matrix(xd_mat[, column.counter]),
+                                      xz_input = as.matrix(xc_mat1)))
+              }) %>% rbindlist() %>% mutate(p=V1, index = 1:ncol(xa_mat))
+
+indices5 <- which(p.adjust(results.5$p, method = "bonferroni") <= 0.05)
+hits5 <- sort(SNP_info$position[indices5])
+
+
+# Manhattan Plot
+
+## phenotype 1 - ERAP2
+my.alpha = 0.05/ncol(xa_mat)
+man1 <- ggplot(results.1, aes(x = index, y = -log10(p))) +
+  geom_point() + 
+  geom_hline(yintercept = -log10(my.alpha), color = 'red', lty = 2) +
+  labs(x = 'Index', y = expression(-log[10]~p), 
+       title = 'GWAS Manhattan Plot- ERAP2', subtitle='Covariates Included')
+
+## phenotype 2 - PEX6
+my.alpha = 0.05/ncol(xa_mat)
+man2 <- ggplot(results.2, aes(x = index, y = -log10(p))) +
+  geom_point() + 
+  geom_hline(yintercept = -log10(my.alpha), color = 'red', lty = 2) +
+  labs(x = 'Index', y = expression(-log[10]~p), 
+       title = 'GWAS Manhattan Plot - PEX6', subtitle='Covariates Included')
+
+## phenotype 3 - FAHD1
+my.alpha = 0.05/ncol(xa_mat)
+man3 <- ggplot(results.3, aes(x = index, y = -log10(p))) +
+  geom_point() + 
+  geom_hline(yintercept = -log10(my.alpha), color = 'red', lty = 2) +
+  labs(x = 'Index', y = expression(-log[10]~p), 
+       title = 'GWAS Manhattan Plot - FAHD1', subtitle='Covariates Included')
+
+## phenotype 4 - GFM1
+my.alpha = 0.05/ncol(xa_mat)
+man4 <- ggplot(results.4, aes(x = index, y = -log10(p))) +
+  geom_point() + 
+  geom_hline(yintercept = -log10(my.alpha), color = 'red', lty = 2) +
+  labs(x = 'Index', y = expression(-log[10]~p), 
+       title = 'GWAS Manhattan Plot - GFM1', subtitle='Covariates Included')
+
+## phenotype 5 - MARCHF7
+my.alpha = 0.05/ncol(xa_mat)
+man5 <- ggplot(results.5, aes(x = index, y = -log10(p))) +
+  geom_point() + 
+  geom_hline(yintercept = -log10(my.alpha), color = 'red', lty = 2) +
+  labs(x = 'Index', y = expression(-log[10]~p), 
+       title = 'GWAS Manhattan Plot - MARCHF7', subtitle='Covariates Included')
+
+
+# QQ plot
+## phenotype 1 - ERAP2
+observed_pvals = sort(results.1$p)
+expected_pvals = qunif(seq(0, 1, length.out = length(observed_pvals) + 2), min = 0, max = 1)  ## Generate expected values. Note that we are using length+2
+expected_pvals = expected_pvals[expected_pvals != 0 & expected_pvals != 1]  ## Remove the two extra values since they are 0 and 1
+
+p_df = data.frame(observed = -log10(observed_pvals),
+                  expected = -log10(expected_pvals))
+
+qq <- ggplot(p_df, aes(x = expected, y = observed)) +
+  geom_point() +
+  geom_abline(intercept = 0, slope = 1, color = 'red') +
+  labs(x = '-log10 Expected p-val',
+       y = '-log10 Observed p-val',
+       title = 'GWAS QQ plot - ERAP2',
+       subtitle = 'Covariates Included')
+grid.arrange(man1,qq, ncol=2)
+
+## phenotype 2 - PEX6
+observed_pvals = sort(results.2$p)
+expected_pvals = qunif(seq(0, 1, length.out = length(observed_pvals) + 2), min = 0, max = 1)  ## Generate expected values. Note that we are using length+2
+expected_pvals = expected_pvals[expected_pvals != 0 & expected_pvals != 1]  ## Remove the two extra values since they are 0 and 1
+
+p_df = data.frame(observed = -log10(observed_pvals),
+                  expected = -log10(expected_pvals))
+
+qq <- ggplot(p_df, aes(x = expected, y = observed)) +
+  geom_point() +
+  geom_abline(intercept = 0, slope = 1, color = 'red') +
+  labs(x = '-log10 Expected p-val',
+       y = '-log10 Observed p-val',
+       title = 'GWAS QQ plot - PEX6',
+       subtitle = 'Covariates Included')
+grid.arrange(man2,qq, ncol=2)
+
+## phenotype 3 - FAHD1
+observed_pvals = sort(results.3$p)
+expected_pvals = qunif(seq(0, 1, length.out = length(observed_pvals) + 2), min = 0, max = 1)  ## Generate expected values. Note that we are using length+2
+expected_pvals = expected_pvals[expected_pvals != 0 & expected_pvals != 1]  ## Remove the two extra values since they are 0 and 1
+
+p_df = data.frame(observed = -log10(observed_pvals),
+                  expected = -log10(expected_pvals))
+
+qq <- ggplot(p_df, aes(x = expected, y = observed)) +
+  geom_point() +
+  geom_abline(intercept = 0, slope = 1, color = 'red') +
+  labs(x = '-log10 Expected p-val',
+       y = '-log10 Observed p-val',
+       title = 'GWAS QQ plot - FAHD1',
+       subtitle = 'Covariates Included')
+grid.arrange(man3,qq, ncol=2)
+
+## phenotype 4 - GFM1
+observed_pvals = sort(results.4$p)
+expected_pvals = qunif(seq(0, 1, length.out = length(observed_pvals) + 2), min = 0, max = 1)  ## Generate expected values. Note that we are using length+2
+expected_pvals = expected_pvals[expected_pvals != 0 & expected_pvals != 1]  ## Remove the two extra values since they are 0 and 1
+
+p_df = data.frame(observed = -log10(observed_pvals),
+                  expected = -log10(expected_pvals))
+
+qq <- ggplot(p_df, aes(x = expected, y = observed)) +
+  geom_point() +
+  geom_abline(intercept = 0, slope = 1, color = 'red') +
+  labs(x = '-log10 Expected p-val',
+       y = '-log10 Observed p-val',
+       title = 'GWAS QQ plot - GFM1',
+       subtitle = 'Covariates Included')
+grid.arrange(man4,qq, ncol=2)
+
+## phenotype 5 - MARCHF7
+observed_pvals = sort(results.5$p)
+expected_pvals = qunif(seq(0, 1, length.out = length(observed_pvals) + 2), min = 0, max = 1)  ## Generate expected values. Note that we are using length+2
+expected_pvals = expected_pvals[expected_pvals != 0 & expected_pvals != 1]  ## Remove the two extra values since they are 0 and 1
+
+p_df = data.frame(observed = -log10(observed_pvals),
+                  expected = -log10(expected_pvals))
+
+qq <- ggplot(p_df, aes(x = expected, y = observed)) +
+  geom_point() +
+  geom_abline(intercept = 0, slope = 1, color = 'red') +
+  labs(x = '-log10 Expected p-val',
+       y = '-log10 Observed p-val',
+       title = 'GWAS QQ plot - MARCHF7',
+       subtitle = 'Covariates Included')
+grid.arrange(man5,qq, ncol=2)
+```
+
+```{r}
+library(ggfortify)
+xc.pca<- prcomp(xa_mat %*% t(xa_mat))
+
+autoplot(xc.pca)
+autoplot(xc.pca, data = xc_mat, colour = "Population")
+autoplot(xc.pca, data = xc_mat, colour = "Sex")
+```
+
+
+
